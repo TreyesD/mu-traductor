@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "MU Chat Translator",
+  "version": "1.0.0",
+  "description": "Translates incoming OpenMU chat (PT to ES) inline and outgoing messages (ES to PT).",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://play.openmu.com.br/*", "https://*.openmu.com.br/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
