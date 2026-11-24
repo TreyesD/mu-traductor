@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>MU Translator</title>
+  <style>
+    body{font:15px sans-serif;max-width:520px;margin:40px auto;padding:0 16px}
+    input{width:100%;box-sizing:border-box;padding:8px;margin:6px 0 14px}
+    button{padding:8px 16px}
+    #msg{margin-top:12px;color:#0a7d2c}
+  </style>
+</head>
+<body>
+  <h2>MU Translator</h2>
+  <label>Gemini API key
+    <input id="key" type="password" placeholder="AIza..." autocomplete="off" />
+  </label>
+  <label>Model
+    <input id="model" type="text" />
+  </label>
+  <button id="save">Guardar</button>
+  <button id="test">Probar</button>
+  <div id="msg"></div>
+  <script src="options.js"></script>
+</body>
+</html>

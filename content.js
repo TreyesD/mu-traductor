@@ -9,10 +9,12 @@
   const CHAT_RE = /^\s*\[[^\]]{1,24}\]\s*(?:\[[^\]]{1,24}\]\s*)?[^:\[\]\n]{1,32}:\s+([\s\S]+)$/;
   const SKIP_CHANNELS = /^\s*\[(Sistema|Aviso)\]/i;
 
+  // Rolling window of recent chat lines, sent as context to the translator.
+  const recent = [];
   const ask = (text, sl, tl) =>
     new Promise((resolve) => {
       try {
-        chrome.runtime.sendMessage({ type: "translate", text, sl, tl }, (r) =>
+        chrome.runtime.sendMessage({ type: "translate", text, sl, tl, context: recent.slice(-8) }, (r) =>
           resolve(r && r.ok ? r : null)
         );
       } catch (_) {
@@ -51,7 +53,10 @@
     // Prefer the deepest matching element: skip if a child already matches.
     for (const c of el.children) if (candidateLine(c)) return;
     done.add(el);
+    const full = (el.textContent || "").trim();
     const r = await ask(body, "auto", OWN_LANG);
+    recent.push(full);
+    if (recent.length > 20) recent.shift();
     if (!r || !r.text) { stats.fail++; return; }
     stats.ok++;
     if (r.lang === OWN_LANG) return;
