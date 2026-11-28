@@ -5,9 +5,10 @@
 
   const OWN_LANG = "es";
   const TARGET_OUT = "pt";
-  // Matches "[Channel] [TAG] Name: message" and "[Channel] Name: message".
-  const CHAT_RE = /^\s*\[[^\]]{1,24}\]\s*(?:\[[^\]]{1,24}\]\s*)?[^:\[\]\n]{1,32}:\s+([\s\S]+)$/;
-  const SKIP_CHANNELS = /^\s*\[(Sistema|Aviso)\]/i;
+  // Optional "HH:MM" timestamp, up to two "[Channel]"/"[TAG]" prefixes, then "Name: message".
+  // Player names have no spaces, which keeps system sentences from matching.
+  const CHAT_RE = /^\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)?(?:\[[^\]]{1,24}\]\s*){0,2}[^\s:\[\]]{2,16}:\s+([\s\S]+)$/;
+  const SKIP_CHANNELS = /^\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)?\[(Sistema|Aviso|System)\]/i;
 
   // Rolling window of recent chat lines, sent as context to the translator.
   const recent = [];
@@ -54,17 +55,20 @@
     for (const c of el.children) if (candidateLine(c)) return;
     done.add(el);
     const full = (el.textContent || "").trim();
+    const out = document.createElement("span");
+    out.className = "mu-tr";
+    out.textContent = "↳ ...";
+    el.appendChild(out);
     const r = await ask(body, "auto", OWN_LANG);
     recent.push(full);
     if (recent.length > 20) recent.shift();
-    if (!r || !r.text) { stats.fail++; return; }
+    if (!r || !r.text) { stats.fail++; out.remove(); return; }
     stats.ok++;
-    if (r.lang === OWN_LANG) return;
-    if (r.text.trim().toLowerCase() === body.toLowerCase()) return;
-    const out = document.createElement("span");
-    out.className = "mu-tr";
+    if (r.lang === OWN_LANG || r.text.trim().toLowerCase() === body.toLowerCase()) {
+      out.remove();
+      return;
+    }
     out.textContent = "↳ " + r.text;
-    el.appendChild(out);
   }
 
   function scan(root) {
@@ -130,13 +134,54 @@
   }
 
   function findGameInput() {
-    const all = document.querySelectorAll("input[type=text],input:not([type]),textarea");
-    for (const i of all) {
-      if (i === boxInput) continue;
-      const ph = (i.placeholder || "").toLowerCase();
-      if (/enter|hablar|falar|chat/.test(ph)) return i;
-    }
-    return null;
+    let found = null;
+    walk(document, (i) => {
+      if (found || i === boxInput) return;
+      const tag = i.tagName;
+      const isField = tag === "INPUT" || tag === "TEXTAREA" || i.isContentEditable;
+      if (!isField) return;
+      const ph = (
+        i.placeholder || i.getAttribute("placeholder") ||
+        i.getAttribute("data-placeholder") || i.getAttribute("aria-label") || ""
+      ).toLowerCase();
+      if (/enter|hablar|falar|chat|mensaje|mensagem|escribe|escreva|message/.test(ph)) found = i;
+    });
+    return found;
+  }
+
+  function fillGameInput(gi, text) {
+    gi.focus();
+    if (gi.select) gi.select();
+    // insertText behaves like real typing, so the game's own handlers see it.
+    const ok = document.execCommand && document.execCommand("insertText", false, text);
+    if (!ok) setNativeValue(gi, text);
+  }
+
+  async function copyText(t) {
+    try {
+      await navigator.clipboard.writeText(t);
+      return;
+    } catch (_) {}
+    // Fallback: temporary textarea + execCommand.
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+    document.documentElement.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    ta.remove();
+  }
+
+  function toast(text) {
+    boxNote.textContent = text;
+    box.style.display = "block";
+    boxInput.style.display = "none";
+    setTimeout(() => {
+      box.style.display = "none";
+      boxInput.style.display = "";
+      boxNote.textContent = "";
+    }, 2500);
   }
 
   async function translateOut(text) {
@@ -163,23 +208,24 @@
           e.preventDefault();
           const txt = boxInput.value.trim();
           if (!txt) return;
-          boxNote.textContent = "...";
+          boxInput.value = "";
+          // Keep the box (and its focus) alive until the text is copied.
+          boxNote.textContent = "Traduciendo...";
           const pt = await translateOut(txt);
           if (!pt) {
-            boxNote.textContent = "Translation failed";
+            toast("Error al traducir");
             return;
           }
-          try { await navigator.clipboard.writeText(pt); } catch (_) {}
+          await copyText(pt);
           const gi = findGameInput();
           if (gi) {
-            setNativeValue(gi, pt);
-            gi.focus();
-            boxNote.textContent = pt + "  (listo: Enter para enviar)";
+            box.style.display = "none";
+            boxInput.style.display = "";
+            boxNote.textContent = "";
+            fillGameInput(gi, pt);
           } else {
-            boxNote.textContent = pt + "  (copiado: Ctrl+V en el chat)";
+            toast(pt + "  (copiado: Ctrl+V en el chat)");
           }
-          boxInput.value = "";
-          box.style.display = gi ? "none" : "block";
         }
         return;
       }

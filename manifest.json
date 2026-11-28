@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "MU Chat Translator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Translates OpenMU chat inline (PT to ES) and outgoing messages (ES to PT), using Gemini with game context.",
   "permissions": ["storage"],
   "host_permissions": [
+    "http://127.0.0.1:3777/*",
     "https://generativelanguage.googleapis.com/*",
     "https://translate.googleapis.com/*",
     "https://api.mymemory.translated.net/*"
